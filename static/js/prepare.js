@@ -11,11 +11,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pomodoroInput = document.getElementById('pomodoro-time');
     const breakInput = document.getElementById('break-time');
 
-    // ★修正点: localStorageからではなく、userオブジェクトから時間を読み込む
     pomodoroInput.value = user.pomodoro_time || 25;
     breakInput.value = user.break_time || 5;
 
-    // ... (ToDoの読み込み部分は変更なし) ...
     const selectableTodosContainer = document.getElementById('selectable-todos');
     const priorityList = document.getElementById('priority-list');
     let allTodos = [];
@@ -40,13 +38,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (e.target.checked) {
                 const li = document.createElement('li');
                 li.dataset.id = todoId;
-                li.innerHTML = `
-                    <span>${todoName}</span>
-                    <div>
-                        <button class="priority-up">↑</button>
-                        <button class="priority-down">↓</button>
-                    </div>
-                `;
+                // ★修正点: ドラッグ可能にするために draggable="true" を追加
+                li.draggable = true;
+                // ★修正点: 矢印ボタンを削除
+                li.innerHTML = `<span>${todoName}</span>`;
                 priorityList.appendChild(li);
             } else {
                 const itemToRemove = priorityList.querySelector(`li[data-id='${todoId}']`);
@@ -55,22 +50,48 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
     
-    priorityList.addEventListener('click', (e) => {
-        const li = e.target.closest('li');
-        if (!li) return;
+    // ★追加点: ドラッグ＆ドロップのイベントリスナー
+    let draggedItem = null;
 
-        if (e.target.classList.contains('priority-up')) {
-            if (li.previousElementSibling) {
-                priorityList.insertBefore(li, li.previousElementSibling);
-            }
-        } else if (e.target.classList.contains('priority-down')) {
-            if (li.nextElementSibling) {
-                priorityList.insertBefore(li.nextElementSibling, li);
-            }
+    priorityList.addEventListener('dragstart', (e) => {
+        draggedItem = e.target;
+        // ドラッグ中の要素にスタイルを適用（任意）
+        setTimeout(() => {
+            e.target.style.opacity = '0.5';
+        }, 0);
+    });
+
+    priorityList.addEventListener('dragend', (e) => {
+        // スタイルを元に戻す
+        e.target.style.opacity = '1';
+        draggedItem = null;
+    });
+
+    priorityList.addEventListener('dragover', (e) => {
+        e.preventDefault(); // デフォルトの動作をキャンセル
+        const afterElement = getDragAfterElement(priorityList, e.clientY);
+        if (afterElement == null) {
+            priorityList.appendChild(draggedItem);
+        } else {
+            priorityList.insertBefore(draggedItem, afterElement);
         }
     });
 
-    // ★修正点: 作業開始ボタンの処理を修正
+    // ドラッグ先の位置を計算するヘルパー関数
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('li:not(.dragging)')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
     document.getElementById('start-work-btn').addEventListener('click', async () => {
         const pomodoroTime = pomodoroInput.value;
         const breakTime = breakInput.value;
@@ -89,7 +110,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         
-        // --- ★追加点: DBに新しい時間設定を保存 ---
         const settings = {
             user_id: user.id,
             pomodoro_time: pomodoroTime,
@@ -101,7 +121,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             body: JSON.stringify(settings),
         });
 
-        // --- ★追加点: localStorageのユーザー情報と時間設定も更新 ---
         user.pomodoro_time = pomodoroTime;
         user.break_time = breakTime;
         localStorage.setItem('pomodoroUser', JSON.stringify(user));

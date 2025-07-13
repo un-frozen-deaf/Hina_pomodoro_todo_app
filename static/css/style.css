@@ -166,8 +166,6 @@ input[type="text"], input[type="date"], input[type="number"] {
     border-radius: 10px;
 }
 
-/* style.css の末尾に追記 */
-
 /* ToDoアイテムのレイアウト調整 */
 li .task-content {
     flex-grow: 1;
@@ -198,4 +196,12 @@ li .edit-btn:hover {
 /* 編集フォームのボタン */
 #edit-todo-form button {
     margin-right: 10px;
+}
+
+/* 優先度リストのスタイル */
+#priority-list li {
+    cursor: move; /* カーソルを移動アイコンに変更 */
+    padding: 15px;
+    border: 1px solid #ddd;
+    background-color: #f9f9f9;
 }
