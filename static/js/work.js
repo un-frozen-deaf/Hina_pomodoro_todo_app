@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextSessionInfo = document.getElementById('next-session-info');
     const pomodoroCountDisplay = document.getElementById('pomodoro-count');
     const startStopBtn = document.getElementById('start-stop-btn');
+    const resetBtn = document.getElementById('reset-btn');
     const quitBtn = document.getElementById('quit-btn');
     const workTaskList = document.getElementById('work-task-list');
     const notificationSound = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
@@ -164,6 +165,27 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(state.timerInterval);
         }
         updateUI();
+    });
+
+    resetBtn.addEventListener('click', () => {
+        // 確認ダイアログを表示
+        if (confirm('現在のタイマーをリセットしますか？')) {
+            // タイマーを停止
+            clearInterval(state.timerInterval);
+            state.isRunning = false;
+
+            // 現在のセッションに応じて残り時間をリセット
+            if (state.isWork) {
+                state.timeLeft = pomodoroTime * 60;
+            } else {
+                state.timeLeft = breakTime * 60;
+            }
+
+            // UIを更新してリセット状態を反映
+            updateUI();
+            // 状態を保存
+            saveState();
+        }
     });
 
     quitBtn.addEventListener('click', () => {
