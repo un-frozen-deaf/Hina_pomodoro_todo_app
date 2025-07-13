@@ -1,4 +1,12 @@
+// static/js/work.js (全体を書き換え)
+
 document.addEventListener('DOMContentLoaded', () => {
+    // --- モーダル関連の要素を取得 ---
+    const timerEndModal = document.getElementById('timer-end-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalMessage = document.getElementById('modal-message');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+
     // セッション情報を取得
     const tasks = JSON.parse(sessionStorage.getItem('workSessionTasks'));
     const pomodoroTime = parseInt(localStorage.getItem('pomodoroTime'), 10);
@@ -19,7 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const quitBtn = document.getElementById('quit-btn');
     const workTaskList = document.getElementById('work-task-list');
     
-    const notificationSound = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3'); // 通知音
+    // 通知音はそのまま利用
+    const notificationSound = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
 
     let state = {
         isWork: true,
@@ -29,6 +38,20 @@ document.addEventListener('DOMContentLoaded', () => {
         timerInterval: null,
         completedTasks: []
     };
+
+    // --- 新しいモーダル表示関数 ---
+    function showTimerModal(title, message) {
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        timerEndModal.style.display = 'flex';
+    }
+
+    // モーダルの閉じるボタンの処理
+    modalCloseBtn.addEventListener('click', () => {
+        timerEndModal.style.display = 'none';
+        // ユーザーがモーダルを閉じたら、次のセッションを開始する準備ができたことを示す
+        // 実際のタイマースタートは、ユーザーが再度「スタート」ボタンを押すことで行われる
+    });
 
     // 初期表示設定
     function setupUI() {
@@ -51,15 +74,19 @@ document.addEventListener('DOMContentLoaded', () => {
             workTaskList.appendChild(li);
         });
         
-        // タスク完了チェックボックス
         document.querySelectorAll('.complete-task-checkbox').forEach(cb => {
-            cb.addEventListener('change', function() {
+            cb.addEventListener('change', async function() { // asyncを追加
                 if (this.checked) {
                     const li = this.closest('li');
                     li.classList.add('completed');
-                    workTaskList.appendChild(li); // 一番下に移動
-                    state.completedTasks.push(li.dataset.id);
-                    this.disabled = true; // 再度押せないようにする
+                    workTaskList.appendChild(li); 
+                    
+                    const taskId = li.dataset.id;
+                    state.completedTasks.push(taskId);
+                    this.disabled = true;
+
+                    // ★修正点: タスク完了を即時DBに反映
+                    await fetch(`/api/todos/complete/${taskId}`, { method: 'POST' });
                 }
             });
         });
@@ -74,6 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function tick() {
         state.timeLeft--;
         timerDisplay.textContent = formatTime(state.timeLeft);
+        document.title = `${formatTime(state.timeLeft)} - ${state.isWork ? '作業中' : '休憩中'}`; // ★ページタイトル更新を追加
+
         if (state.timeLeft <= 0) {
             clearInterval(state.timerInterval);
             notificationSound.play();
@@ -81,27 +110,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- switchSession関数をモーダル対応に修正 ---
     function switchSession() {
         state.isRunning = false;
         startStopBtn.textContent = 'スタート';
+        document.title = 'ポモドーロタイマー'; // 元のタイトルに戻す
         
         if (state.isWork) {
             // 作業 -> 休憩
-            alert('ポモドーロ終了！休憩を開始してください。');
             state.isWork = false;
             state.timeLeft = breakTime * 60;
             statusDisplay.textContent = '休憩';
             nextSessionInfo.textContent = `次は ポモドーロ (${pomodoroTime}分)`;
+            showTimerModal('ポモドーロ終了！', `お疲れ様でした。${breakTime}分間の休憩に入ります。`);
         } else {
             // 休憩 -> 作業
-            alert('休憩終了！次のポモドーロを開始してください。');
             state.isWork = true;
             state.pomodoroCount++;
             state.timeLeft = pomodoroTime * 60;
             statusDisplay.textContent = 'ポモドーロ';
             nextSessionInfo.textContent = `次は 休憩 (${breakTime}分)`;
             pomodoroCountDisplay.textContent = `${state.pomodoroCount} ポモドーロ目`;
+            showTimerModal('休憩終了！', '次の作業セッションを開始しましょう。');
         }
+        // 次のセッションの時間を表示
         timerDisplay.textContent = formatTime(state.timeLeft);
     }
     
@@ -116,14 +148,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    quitBtn.addEventListener('click', async () => {
+    quitBtn.addEventListener('click', () => { // asyncは不要に
         clearInterval(state.timerInterval);
         const totalWorkMinutes = (state.pomodoroCount - 1) * pomodoroTime + (pomodoroTime - Math.floor(state.timeLeft / 60));
 
-        // 完了したタスクをDBに反映
-        for (const taskId of state.completedTasks) {
-            await fetch(`/api/todos/complete/${taskId}`, { method: 'POST' });
-        }
+        // タスク完了は都度DBに反映されるため、ここでの一括処理は不要に
         
         alert(`お疲れ様でした！\n総作業時間: 約${totalWorkMinutes}分\n完了したタスク: ${state.completedTasks.length}個`);
         
