@@ -94,3 +94,33 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all() # ローカルのSQLite用にテーブルを作成
     app.run(debug=True)
+    
+
+# --- 既存のAPIエンドポイントの下に、以下の2つを追加 ---
+
+# 全ユーザーのリストを取得するAPI
+@app.route('/api/users', methods=['GET'])
+def get_all_users():
+    try:
+        users = User.query.all()
+        return jsonify([{'id': user.id, 'username': user.username} for user in users])
+    except Exception as e:
+        # エラーログを出力するとデバッグに役立ちます
+        print(f"Error fetching users: {e}")
+        return jsonify({'error': 'Could not fetch users'}), 500
+
+# ユーザーを削除するAPI
+@app.route('/api/user/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    # ユーザーに関連するToDoをすべて削除
+    Todo.query.filter_by(user_id=user_id).delete()
+    
+    # ユーザー自身を削除
+    db.session.delete(user)
+    db.session.commit()
+    
+    return jsonify({'message': 'User and all associated tasks deleted successfully'})

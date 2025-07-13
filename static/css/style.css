@@ -109,3 +109,59 @@ input[type="text"], input[type="date"], input[type="number"] {
     border-radius: 5px;
     margin-bottom: 15px;
 }
+
+/* ログインモーダル */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    padding: 30px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+}
+
+#existing-users-list .user-select-btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 12px;
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    cursor: pointer;
+}
+#existing-users-list .user-select-btn:hover {
+    background-color: #dee2e6;
+}
+
+/* ユーザー情報表示 */
+#user-info {
+    position: absolute;
+    top: 15px;
+    right: 25px;
+    font-size: 14px;
+    color: #666;
+    background: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+#user-info button {
+    margin-left: 8px;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 10px;
+}
