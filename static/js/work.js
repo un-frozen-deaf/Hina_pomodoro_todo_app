@@ -1,24 +1,26 @@
 // static/js/work.js (全体を書き換え)
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- モーダル関連の要素を取得 ---
     const timerEndModal = document.getElementById('timer-end-modal');
     const modalTitle = document.getElementById('modal-title');
     const modalMessage = document.getElementById('modal-message');
     const modalCloseBtn = document.getElementById('modal-close-btn');
 
-    // セッション情報を取得
-    const tasks = JSON.parse(sessionStorage.getItem('workSessionTasks'));
+    // ★修正点: sessionStorageのキーを定義
+    const SESSION_STORAGE_KEY = 'pomodoroSessionState';
+
     const pomodoroTime = parseInt(localStorage.getItem('pomodoroTime'), 10);
     const breakTime = parseInt(localStorage.getItem('breakTime'), 10);
 
+    // ページ読み込み時のタスクリストの取得元をsessionStorageに変更
+    const tasks = JSON.parse(sessionStorage.getItem('workSessionTasks'));
+    
     if (!tasks || !pomodoroTime || !breakTime) {
         alert('セッション情報がありません。準備画面に戻ります。');
         window.location.href = '/prepare';
         return;
     }
 
-    // UI要素
     const statusDisplay = document.getElementById('session-status');
     const timerDisplay = document.getElementById('timer-display');
     const nextSessionInfo = document.getElementById('next-session-info');
@@ -26,8 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const startStopBtn = document.getElementById('start-stop-btn');
     const quitBtn = document.getElementById('quit-btn');
     const workTaskList = document.getElementById('work-task-list');
-    
-    // 通知音はそのまま利用
     const notificationSound = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
 
     let state = {
@@ -39,27 +39,46 @@ document.addEventListener('DOMContentLoaded', () => {
         completedTasks: []
     };
 
-    // --- 新しいモーダル表示関数 ---
+    // ★修正点: 状態を保存する関数
+    function saveState() {
+        // timerIntervalは保存できないので除外
+        const stateToSave = { ...state, timerInterval: null };
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(stateToSave));
+    }
+
+    // ★修正点: 状態を読み込む関数
+    function loadState() {
+        const savedState = sessionStorage.getItem(SESSION_STORAGE_KEY);
+        if (savedState) {
+            // 保存された状態があれば、現在のstateを上書き
+            state = JSON.parse(savedState);
+            // ページリロード後はタイマーが止まっているので、isRunningをfalseに設定
+            state.isRunning = false; 
+        } else {
+            // 保存されたstateがない場合（セッションの初回開始時）
+            saveState(); // 初期状態を保存
+        }
+    }
+
     function showTimerModal(title, message) {
         modalTitle.textContent = title;
         modalMessage.textContent = message;
         timerEndModal.style.display = 'flex';
     }
 
-    // モーダルの閉じるボタンの処理
     modalCloseBtn.addEventListener('click', () => {
         timerEndModal.style.display = 'none';
-        // ユーザーがモーダルを閉じたら、次のセッションを開始する準備ができたことを示す
-        // 実際のタイマースタートは、ユーザーが再度「スタート」ボタンを押すことで行われる
     });
 
-    // 初期表示設定
-    function setupUI() {
+    // UIを現在のstateに基づいて更新する関数
+    function updateUI() {
         timerDisplay.textContent = formatTime(state.timeLeft);
-        statusDisplay.textContent = 'ポモドーロ';
-        nextSessionInfo.textContent = `次は 休憩 (${breakTime}分)`;
+        document.title = `${formatTime(state.timeLeft)} - ${state.isWork ? '作業中' : '休憩中'}`;
+
+        statusDisplay.textContent = state.isWork ? 'ポモドーロ' : '休憩';
+        nextSessionInfo.textContent = `次は ${state.isWork ? '休憩' : 'ポモドーロ'} (${state.isWork ? breakTime : pomodoroTime}分)`;
         pomodoroCountDisplay.textContent = `${state.pomodoroCount} ポモドーロ目`;
-        renderTasks();
+        startStopBtn.textContent = state.isRunning ? 'ストップ' : 'スタート';
     }
     
     function renderTasks() {
@@ -71,21 +90,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>${task.name}</span>
                 <input type="checkbox" class="complete-task-checkbox">
             `;
+            // ★修正点: 完了済みタスクの状態を復元
+            if (state.completedTasks.includes(task.id)) {
+                li.classList.add('completed');
+                li.querySelector('.complete-task-checkbox').checked = true;
+                li.querySelector('.complete-task-checkbox').disabled = true;
+            }
             workTaskList.appendChild(li);
         });
         
         document.querySelectorAll('.complete-task-checkbox').forEach(cb => {
-            cb.addEventListener('change', async function() { // asyncを追加
+            cb.addEventListener('change', async function() {
                 if (this.checked) {
                     const li = this.closest('li');
                     li.classList.add('completed');
                     workTaskList.appendChild(li); 
                     
                     const taskId = li.dataset.id;
-                    state.completedTasks.push(taskId);
+                    // ★修正点: stateにも完了タスクを記録
+                    if (!state.completedTasks.includes(taskId)) {
+                        state.completedTasks.push(taskId);
+                    }
+                    saveState(); // 状態を保存
                     this.disabled = true;
 
-                    // ★修正点: タスク完了を即時DBに反映
                     await fetch(`/api/todos/complete/${taskId}`, { method: 'POST' });
                 }
             });
@@ -100,8 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function tick() {
         state.timeLeft--;
-        timerDisplay.textContent = formatTime(state.timeLeft);
-        document.title = `${formatTime(state.timeLeft)} - ${state.isWork ? '作業中' : '休憩中'}`; // ★ページタイトル更新を追加
+        updateUI(); // UI更新を共通関数に
+        saveState(); // ★修正点: 1秒ごとに状態を保存
 
         if (state.timeLeft <= 0) {
             clearInterval(state.timerInterval);
@@ -110,56 +138,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- switchSession関数をモーダル対応に修正 ---
     function switchSession() {
         state.isRunning = false;
-        startStopBtn.textContent = 'スタート';
-        document.title = 'ポモドーロタイマー'; // 元のタイトルに戻す
+        document.title = 'ポモドーロタイマー'; 
         
         if (state.isWork) {
-            // 作業 -> 休憩
             state.isWork = false;
             state.timeLeft = breakTime * 60;
-            statusDisplay.textContent = '休憩';
-            nextSessionInfo.textContent = `次は ポモドーロ (${pomodoroTime}分)`;
             showTimerModal('ポモドーロ終了！', `お疲れ様でした。${breakTime}分間の休憩に入ります。`);
         } else {
-            // 休憩 -> 作業
             state.isWork = true;
             state.pomodoroCount++;
             state.timeLeft = pomodoroTime * 60;
-            statusDisplay.textContent = 'ポモドーロ';
-            nextSessionInfo.textContent = `次は 休憩 (${breakTime}分)`;
-            pomodoroCountDisplay.textContent = `${state.pomodoroCount} ポモドーロ目`;
             showTimerModal('休憩終了！', '次の作業セッションを開始しましょう。');
         }
-        // 次のセッションの時間を表示
-        timerDisplay.textContent = formatTime(state.timeLeft);
+        updateUI();
+        saveState(); // ★修正点: セッション切り替え後にも状態を保存
     }
     
     startStopBtn.addEventListener('click', () => {
         state.isRunning = !state.isRunning;
         if (state.isRunning) {
-            startStopBtn.textContent = 'ストップ';
             state.timerInterval = setInterval(tick, 1000);
         } else {
-            startStopBtn.textContent = 'スタート';
             clearInterval(state.timerInterval);
         }
+        updateUI();
     });
 
-    quitBtn.addEventListener('click', () => { // asyncは不要に
+    quitBtn.addEventListener('click', () => {
         clearInterval(state.timerInterval);
-        const totalWorkMinutes = (state.pomodoroCount - 1) * pomodoroTime + (pomodoroTime - Math.floor(state.timeLeft / 60));
-
-        // タスク完了は都度DBに反映されるため、ここでの一括処理は不要に
-        
-        alert(`お疲れ様でした！\n総作業時間: 約${totalWorkMinutes}分\n完了したタスク: ${state.completedTasks.length}個`);
-        
+        // ★修正点: セッション情報をクリア
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
         sessionStorage.removeItem('workSessionTasks');
+        
+        alert(`お疲れ様でした！`);
         window.location.href = '/';
     });
 
-    // 初期化
-    setupUI();
+    // --- 初期化処理 ---
+    loadState(); // ★修正点: ページ読み込み時にまず状態を復元
+    updateUI();  // ★修正点: 復元した状態をUIに反映
+    renderTasks();
 });

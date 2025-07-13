@@ -1,3 +1,5 @@
+// static/js/prepare.js (全体を書き換え)
+
 document.addEventListener('DOMContentLoaded', async () => {
     const user = JSON.parse(localStorage.getItem('pomodoroUser'));
     if (!user) {
@@ -6,17 +8,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // 前回使用した時間をlocalStorageから読み込む
-    const lastPomodoroTime = localStorage.getItem('pomodoroTime') || 25;
-    const lastBreakTime = localStorage.getItem('breakTime') || 5;
-    document.getElementById('pomodoro-time').value = lastPomodoroTime;
-    document.getElementById('break-time').value = lastBreakTime;
+    const pomodoroInput = document.getElementById('pomodoro-time');
+    const breakInput = document.getElementById('break-time');
 
+    // ★修正点: localStorageからではなく、userオブジェクトから時間を読み込む
+    pomodoroInput.value = user.pomodoro_time || 25;
+    breakInput.value = user.break_time || 5;
+
+    // ... (ToDoの読み込み部分は変更なし) ...
     const selectableTodosContainer = document.getElementById('selectable-todos');
     const priorityList = document.getElementById('priority-list');
     let allTodos = [];
 
-    // ToDoを読み込み
     const response = await fetch(`/api/todos/${user.id}`);
     allTodos = await response.json();
     
@@ -29,14 +32,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         selectableTodosContainer.appendChild(div);
     });
 
-    // チェックボックスの変更を監視
     selectableTodosContainer.addEventListener('change', (e) => {
         if (e.target.type === 'checkbox') {
             const todoId = e.target.dataset.id;
             const todoName = e.target.dataset.name;
 
             if (e.target.checked) {
-                // 優先度リストに追加
                 const li = document.createElement('li');
                 li.dataset.id = todoId;
                 li.innerHTML = `
@@ -48,16 +49,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `;
                 priorityList.appendChild(li);
             } else {
-                // 優先度リストから削除
                 const itemToRemove = priorityList.querySelector(`li[data-id='${todoId}']`);
-                if (itemToRemove) {
-                    itemToRemove.remove();
-                }
+                if (itemToRemove) itemToRemove.remove();
             }
         }
     });
     
-    // 優先度変更（上下矢印）
     priorityList.addEventListener('click', (e) => {
         const li = e.target.closest('li');
         if (!li) return;
@@ -73,10 +70,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // 作業開始ボタン
-    document.getElementById('start-work-btn').addEventListener('click', () => {
-        const pomodoroTime = document.getElementById('pomodoro-time').value;
-        const breakTime = document.getElementById('break-time').value;
+    // ★修正点: 作業開始ボタンの処理を修正
+    document.getElementById('start-work-btn').addEventListener('click', async () => {
+        const pomodoroTime = pomodoroInput.value;
+        const breakTime = breakInput.value;
         
         const prioritizedTasks = Array.from(priorityList.querySelectorAll('li')).map(li => ({
             id: li.dataset.id,
@@ -92,9 +89,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         
-        // 設定とタスクをsessionStorageに保存して次の画面へ
+        // --- ★追加点: DBに新しい時間設定を保存 ---
+        const settings = {
+            user_id: user.id,
+            pomodoro_time: pomodoroTime,
+            break_time: breakTime,
+        };
+        await fetch('/api/user/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings),
+        });
+
+        // --- ★追加点: localStorageのユーザー情報と時間設定も更新 ---
+        user.pomodoro_time = pomodoroTime;
+        user.break_time = breakTime;
+        localStorage.setItem('pomodoroUser', JSON.stringify(user));
         localStorage.setItem('pomodoroTime', pomodoroTime);
         localStorage.setItem('breakTime', breakTime);
+
         sessionStorage.setItem('workSessionTasks', JSON.stringify(prioritizedTasks));
         
         window.location.href = '/work';

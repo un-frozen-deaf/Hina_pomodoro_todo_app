@@ -19,6 +19,9 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     todos = db.relationship('Todo', backref='user', lazy=True)
+    # ★修正点: 時間を保存するカラムを追加 (デフォルト値を設定)
+    pomodoro_time = db.Column(db.Integer, nullable=False, default=25)
+    break_time = db.Column(db.Integer, nullable=False, default=5)
 
 class Todo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -48,12 +51,33 @@ def get_or_create_user():
 
     user = User.query.filter_by(username=username).first()
     if user is None:
-        user = User(username=username)
+        user = User(username=username) # デフォルト値(25, 5)で作成される
         db.session.add(user)
         db.session.commit()
     
-    return jsonify({'id': user.id, 'username': user.username})
-
+    # 時間の情報も含めて返すようにする
+    return jsonify({
+        'id': user.id, 
+        'username': user.username,
+        'pomodoro_time': user.pomodoro_time,
+        'break_time': user.break_time
+    })
+    
+@app.route('/api/user/settings', methods=['POST'])
+def update_user_settings():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+        
+    user.pomodoro_time = data.get('pomodoro_time', user.pomodoro_time)
+    user.break_time = data.get('break_time', user.break_time)
+    db.session.commit()
+    
+    return jsonify({'message': 'Settings updated successfully'})
+    
+    
 @app.route('/api/todos/<int:user_id>', methods=['GET', 'POST'])
 def handle_todos(user_id):
     if request.method == 'POST':
