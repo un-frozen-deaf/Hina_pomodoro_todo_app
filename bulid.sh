@@ -2,8 +2,8 @@
 # exit on error
 set -o errexit
 
-# 必要なライブラリをインストール
 pip install -r requirements.txt
 
-# Flaskのコンテキスト内でdb.create_all()を実行してテーブルを作成
-flask shell <<< "from app import db; db.create_all()"
+# appのコンテキスト内で直接Pythonコードを実行し、DBテーブルを作成する
+# こちらの方が確実性が高い
+python -c "from app import app, db; app.app_context().push(); db.create_all()"
