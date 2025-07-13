@@ -37,7 +37,9 @@ class Todo(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     task_name = db.Column(db.String(200), nullable=False)
     due_date = db.Column(db.String(20))
-
+    # ★修正点: created_at を削除し、color を追加
+    # デフォルトは薄いグレー(#cccccc)
+    color = db.Column(db.String(7), nullable=False, default='#cccccc') 
 class CompletedTask(db.Model):
     """完了済みのタスク履歴を格納するモデル"""
     id = db.Column(db.Integer, primary_key=True)
@@ -137,17 +139,34 @@ def handle_todos(user_id):
         new_todo = Todo(
             user_id=user_id,
             task_name=task_name,
-            due_date=data.get('due_date')
+            due_date=data.get('due_date'),
+            # ★追加点: 色情報を保存
+            color=data.get('color', '#cccccc')
         )
         db.session.add(new_todo)
         db.session.commit()
         return jsonify({'id': new_todo.id, 'message': 'ToDo added successfully'}), 201
     else: # GET
-        todos = Todo.query.filter_by(user_id=user_id).order_by(Todo.due_date.asc()).all()
+        # ★修正点: ソート順のロジックを変更
+        sort_order = request.args.get('sort', 'due_date_asc')
+
+        query = Todo.query.filter_by(user_id=user_id)
+
+        if sort_order == 'due_date_desc':
+            query = query.order_by(Todo.due_date.desc())
+        elif sort_order == 'color':
+            # 色でソート
+            query = query.order_by(Todo.color.asc())
+        else: # デフォルトは 'due_date_asc'
+            query = query.order_by(Todo.due_date.asc())
+
+        todos = query.all()
+        # ★修正点: 色情報もレスポンスに含める
         return jsonify([{
             'id': todo.id,
             'task_name': todo.task_name,
-            'due_date': todo.due_date
+            'due_date': todo.due_date,
+            'color': todo.color
         } for todo in todos])
 
 @app.route('/api/todo/<int:todo_id>', methods=['PUT'])
@@ -164,6 +183,8 @@ def update_todo(todo_id):
         
     todo.task_name = new_task_name
     todo.due_date = data.get('due_date')
+    # ★追加点: 色情報も更新
+    todo.color = data.get('color', todo.color)
     db.session.commit()
     
     return jsonify({'message': 'ToDo updated successfully'})

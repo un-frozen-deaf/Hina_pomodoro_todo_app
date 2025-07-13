@@ -15,6 +15,9 @@
             
             <label for="due-date">〆切期日:</label>
             <input type="date" id="due-date" name="due-date">
+
+            <label for="task-color">色:</label>
+            <input type="color" id="task-color" value="#cccccc">
             
             <button type="submit">登録する</button>
         </form>
@@ -33,6 +36,7 @@
 
             const taskName = document.getElementById('task-name').value;
             const dueDate = document.getElementById('due-date').value;
+            const color = document.getElementById('task-color').value;
 
             const response = await fetch(`/api/todos/${user.id}`, {
                 method: 'POST',
@@ -40,6 +44,7 @@
                 body: JSON.stringify({
                     task_name: taskName,
                     due_date: dueDate,
+                    color: color
                 }),
             });
 

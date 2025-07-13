@@ -98,6 +98,8 @@ input[type="text"], input[type="date"], input[type="number"] {
     gap: 10px;
     margin-top: 20px;
     justify-content: center;
+    /* ★追加点：ボタンが縦に並ばないように */
+    flex-wrap: wrap; 
 }
 
 /* スクロール可能なToDo選択リスト */
@@ -204,4 +206,59 @@ li .edit-btn:hover {
     padding: 15px;
     border: 1px solid #ddd;
     background-color: #f9f9f9;
+}
+
+
+.list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.list-header h1 {
+    margin: 0; /* h1のデフォルトマージンをリセット */
+}
+
+.sort-select {
+    padding: 5px 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+}
+
+/* ToDoアイテムのレイアウトをカラーバーに対応 */
+li {
+    position: relative;
+    padding-left: 25px; /* カラーバーのためのスペース */
+}
+
+.color-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 8px;
+    height: 100%;
+    border-radius: 5px 0 0 5px; /* 角を丸める */
+}
+
+/* カラーピッカーのスタイル */
+input[type="color"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 40px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 15px;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+    border: 1px solid #ccc;
+    border-radius: 5px;
 }

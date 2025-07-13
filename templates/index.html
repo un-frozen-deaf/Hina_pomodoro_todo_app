@@ -11,6 +11,11 @@
 
     <div class="container">
         <h1>ToDoリスト</h1>
+        <select id="sort-todos" class="sort-select">
+            <option value="due_date_asc">〆切が近い順</option>
+            <option value="due_date_desc">〆切が遠い順</option>
+            <option value="color">色順</option>
+        </select>
         <ul id="todo-list">
             </ul>
         <div class="task-actions">
@@ -41,6 +46,9 @@
                 
                 <label for="edit-due-date">〆切期日:</label>
                 <input type="date" id="edit-due-date">
+
+                <label for="edit-task-color">色:</label>
+                <input type="color" id="edit-task-color">
                 
                 <button type="submit">更新する</button>
                 <button type="button" id="edit-modal-cancel-btn" class="button-secondary">キャンセル</button>

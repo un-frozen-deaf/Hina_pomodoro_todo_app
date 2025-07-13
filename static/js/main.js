@@ -1,15 +1,61 @@
+// --------------------------------------------------------------------------
+// メインの処理
+// --------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
+    // アプリケーションのログインフローを開始
     handleLogin();
+
+    // 編集モーダルのフォームとボタンを取得
+    const editForm = document.getElementById('edit-todo-form');
+    const editModal = document.getElementById('edit-todo-modal');
+    const cancelBtn = document.getElementById('edit-modal-cancel-btn');
+
+    // 編集フォームの「更新」ボタンが押されたときの処理
+    editForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const todoId = document.getElementById('edit-todo-id').value;
+        const taskName = document.getElementById('edit-task-name').value;
+        const dueDate = document.getElementById('edit-due-date').value;
+        const color = document.getElementById('edit-task-color').value;
+
+        const response = await fetch(`/api/todo/${todoId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_name: taskName,
+                due_date: dueDate,
+                color: color
+            })
+        });
+
+        if (response.ok) {
+            editModal.style.display = 'none';
+            const user = JSON.parse(localStorage.getItem('pomodoroUser'));
+            loadTodos(user.id); // リストを再読み込みして変更を反映
+        } else {
+            alert('タスクの更新に失敗しました。');
+        }
+    });
+
+    // 編集フォームの「キャンセル」ボタンが押されたときの処理
+    cancelBtn.addEventListener('click', () => {
+        editModal.style.display = 'none';
+    });
 });
 
-// ログイン処理のメイン関数
+// --------------------------------------------------------------------------
+// ログイン・ユーザー管理関連の関数
+// --------------------------------------------------------------------------
+
+/**
+ * ログイン状態を確認し、必要ならログインモーダルを表示する
+ */
 async function handleLogin() {
     let user = JSON.parse(localStorage.getItem('pomodoroUser'));
 
     if (!user) {
         await showLoginModal();
     } else {
-        // ユーザー情報がある場合でも、そのユーザーがDBに存在するか確認
         const response = await fetch('/api/users');
         const users = await response.json();
         const userExists = users.some(u => u.id === user.id);
@@ -17,7 +63,6 @@ async function handleLogin() {
         if (userExists) {
             initializeApp(user);
         } else {
-            // DBにユーザーが存在しない場合は、ストレージをクリアしてログインモーダルを表示
             alert('ユーザー情報がデータベースに見つかりませんでした。再度ログインしてください。');
             localStorage.removeItem('pomodoroUser');
             await showLoginModal();
@@ -25,7 +70,9 @@ async function handleLogin() {
     }
 }
 
-// ログインモーダルを表示する関数
+/**
+ * ログインモーダルを表示し、既存ユーザーのリストを生成する
+ */
 async function showLoginModal() {
     const modal = document.getElementById('login-modal');
     const usersListDiv = document.getElementById('existing-users-list');
@@ -47,7 +94,6 @@ async function showLoginModal() {
         } else {
             usersListDiv.innerHTML += '<p>現在登録されているユーザーはいません。</p>';
         }
-
     } catch (error) {
         console.error(error);
         usersListDiv.innerHTML += '<p>ユーザーの読み込みに失敗しました。</p>';
@@ -57,7 +103,9 @@ async function showLoginModal() {
     modal.style.display = 'flex';
 }
 
-// 新規ユーザーを作成する関数
+/**
+ * 新しいユーザーを作成する
+ */
 async function createNewUser() {
     const username = prompt("新しいユーザー名を入力してください:");
     if (username) {
@@ -75,20 +123,41 @@ async function createNewUser() {
     }
 }
 
-// ユーザーを選択（ログイン）したときの処理
+/**
+ * ユーザーを選択し、ログイン状態にする
+ * @param {object} user - 選択されたユーザーオブジェクト
+ */
 function selectUser(user) {
     localStorage.setItem('pomodoroUser', JSON.stringify(user));
     document.getElementById('login-modal').style.display = 'none';
     initializeApp(user);
 }
 
-// ログイン後のアプリケーション初期化
+/**
+ * ログイン後のアプリケーションを初期化する
+ * @param {object} user - ログイン中のユーザーオブジェクト
+ */
 function initializeApp(user) {
     displayUserInfo(user);
     loadTodos(user.id);
+
+    // ソート用ドロップダウンのイベントリスナーを設定
+    const sortSelect = document.getElementById('sort-todos');
+    const savedSort = localStorage.getItem('todoSortOrder');
+    if (savedSort) {
+        sortSelect.value = savedSort;
+    }
+
+    sortSelect.addEventListener('change', () => {
+        localStorage.setItem('todoSortOrder', sortSelect.value);
+        loadTodos(user.id);
+    });
 }
 
-// ユーザー情報を右上に表示する関数
+/**
+ * 画面右上にユーザー情報を表示する
+ * @param {object} user - ログイン中のユーザーオブジェクト
+ */
 function displayUserInfo(user) {
     const userInfoDiv = document.getElementById('user-info');
     userInfoDiv.innerHTML = `
@@ -97,13 +166,11 @@ function displayUserInfo(user) {
         <button id="delete-user-btn" class="button-danger">削除</button>
     `;
 
-    // ユーザー変更ボタン
     document.getElementById('change-user-btn').onclick = () => {
         localStorage.removeItem('pomodoroUser');
         window.location.reload();
     };
 
-    // ユーザー削除ボタン
     document.getElementById('delete-user-btn').onclick = async () => {
         const confirmation = confirm(
             `本当にユーザー「${user.username}」を削除しますか？\nこのユーザーに関連するすべてのToDoタスクも完全に削除され、元に戻せません。`
@@ -121,9 +188,17 @@ function displayUserInfo(user) {
     };
 }
 
+// --------------------------------------------------------------------------
+// ToDoリスト関連の関数
+// --------------------------------------------------------------------------
 
+/**
+ * ToDoリストをサーバーから読み込み、画面に表示する
+ * @param {number} userId - ログイン中のユーザーID
+ */
 async function loadTodos(userId) {
-    const response = await fetch(`/api/todos/${userId}`);
+    const sortOrder = document.getElementById('sort-todos').value;
+    const response = await fetch(`/api/todos/${userId}?sort=${sortOrder}`);
     const todos = await response.json();
     const todoList = document.getElementById('todo-list');
     todoList.innerHTML = ''; 
@@ -135,8 +210,8 @@ async function loadTodos(userId) {
             const li = document.createElement('li');
             li.dataset.id = todo.id;
             
-            // ★修正点: タスク表示部分に編集ボタンを追加
             li.innerHTML = `
+                <div class="color-bar"></div>
                 <div class="task-content">
                     <span>${todo.task_name}</span>
                     <small>(〆切: ${todo.due_date || '未設定'})</small>
@@ -146,9 +221,9 @@ async function loadTodos(userId) {
                     <input type="checkbox" class="complete-checkbox" title="完了">
                 </div>
             `;
+            li.querySelector('.color-bar').style.backgroundColor = todo.color;
             todoList.appendChild(li);
 
-            // ★追加点: 編集ボタンにイベントリスナーを追加
             li.querySelector('.edit-btn').addEventListener('click', () => {
                 openEditModal(todo);
             });
@@ -176,50 +251,14 @@ async function loadTodos(userId) {
     });
 }
 
-// ★追加点: 編集モーダルを開く関数
+/**
+ * 編集モーダルを開き、選択したタスクの情報をセットする
+ * @param {object} todo - 編集対象のToDoオブジェクト
+ */
 function openEditModal(todo) {
     document.getElementById('edit-todo-id').value = todo.id;
     document.getElementById('edit-task-name').value = todo.task_name;
     document.getElementById('edit-due-date').value = todo.due_date;
+    document.getElementById('edit-task-color').value = todo.color;
     document.getElementById('edit-todo-modal').style.display = 'flex';
 }
-
-// ★追加点: ファイルの末尾に編集モーダルの処理を追加
-document.addEventListener('DOMContentLoaded', () => {
-    // ... (既存のDOMContentLoaded内の処理はそのまま) ...
-
-    const editForm = document.getElementById('edit-todo-form');
-    const editModal = document.getElementById('edit-todo-modal');
-    const cancelBtn = document.getElementById('edit-modal-cancel-btn');
-
-    // 更新フォームの送信処理
-    editForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const todoId = document.getElementById('edit-todo-id').value;
-        const taskName = document.getElementById('edit-task-name').value;
-        const dueDate = document.getElementById('edit-due-date').value;
-
-        const response = await fetch(`/api/todo/${todoId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                task_name: taskName,
-                due_date: dueDate,
-            })
-        });
-
-        if (response.ok) {
-            editModal.style.display = 'none';
-            // ユーザー情報を再取得してリストをリロード
-            const user = JSON.parse(localStorage.getItem('pomodoroUser'));
-            loadTodos(user.id);
-        } else {
-            alert('タスクの更新に失敗しました。');
-        }
-    });
-
-    // キャンセルボタンの処理
-    cancelBtn.addEventListener('click', () => {
-        editModal.style.display = 'none';
-    });
-});
