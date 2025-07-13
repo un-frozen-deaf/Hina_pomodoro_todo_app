@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作業中</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* この画面専用のスタイル */
+        .timer-display {
+            font-size: 5rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+            color: #5c67f2;
+        }
+        .session-info {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 id="session-status">ポモドーロ</h2>
+        <div id="timer-display" class="timer-display">25:00</div>
+        <p id="next-session-info" class="session-info">次は 休憩 (5分)</p>
+        <p id="pomodoro-count" class="session-info">1 ポモドーロ目</p>
+
+        <div class="task-actions">
+            <button id="start-stop-btn">スタート</button>
+            <button id="quit-btn" class="button-danger">ポモドーロをやめる</button>
+        </div>
+        
+        <hr>
+        <h3>現在のタスクリスト</h3>
+        <ul id="work-task-list">
+            </ul>
+    </div>
+    <script src="/static/js/work.js"></script>
+</body>
+</html>

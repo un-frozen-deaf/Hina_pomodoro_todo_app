@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToDo登録</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>ToDoの新規登録</h1>
+        <form id="add-todo-form">
+            <label for="task-name">タスクの名前:</label>
+            <input type="text" id="task-name" name="task-name" required>
+            
+            <label for="due-date">〆切期日:</label>
+            <input type="date" id="due-date" name="due-date">
+            
+            <button type="submit">登録する</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('add-todo-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const user = JSON.parse(localStorage.getItem('pomodoroUser'));
+            if (!user) {
+                alert('ユーザー情報が見つかりません。トップページに戻ってログインしてください。');
+                window.location.href = '/';
+                return;
+            }
+
+            const taskName = document.getElementById('task-name').value;
+            const dueDate = document.getElementById('due-date').value;
+
+            const response = await fetch(`/api/todos/${user.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    task_name: taskName,
+                    due_date: dueDate,
+                }),
+            });
+
+            if (response.ok) {
+                alert('ToDoを登録しました！');
+                window.location.href = '/'; // ToDoリスト画面に戻る
+            } else {
+                alert('登録に失敗しました。');
+            }
+        });
+    </script>
+</body>
+</html>
