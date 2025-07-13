@@ -148,3 +148,23 @@ def delete_user(user_id):
     db.session.commit()
     
     return jsonify({'message': 'User and all associated tasks deleted successfully'})
+
+@app.route('/api/todo/<int:todo_id>', methods=['PUT'])
+def update_todo(todo_id):
+    todo = Todo.query.get(todo_id)
+    if not todo:
+        return jsonify({'error': 'ToDo not found'}), 404
+        
+    data = request.get_json()
+    new_task_name = data.get('task_name')
+    new_due_date = data.get('due_date')
+
+    if not new_task_name:
+        return jsonify({'error': 'Task name is required'}), 400
+        
+    todo.task_name = new_task_name
+    todo.due_date = new_due_date
+    db.session.commit()
+    
+    return jsonify({'message': 'ToDo updated successfully'})
+

@@ -122,7 +122,6 @@ function displayUserInfo(user) {
 }
 
 
-// ToDoリストを読み込む関数（以前のものと同じ、変更なし）
 async function loadTodos(userId) {
     const response = await fetch(`/api/todos/${userId}`);
     const todos = await response.json();
@@ -135,11 +134,24 @@ async function loadTodos(userId) {
         todos.forEach(todo => {
             const li = document.createElement('li');
             li.dataset.id = todo.id;
+            
+            // ★修正点: タスク表示部分に編集ボタンを追加
             li.innerHTML = `
-                <span>${todo.task_name} (〆切: ${todo.due_date || '未設定'})</span>
-                <input type="checkbox" class="complete-checkbox">
+                <div class="task-content">
+                    <span>${todo.task_name}</span>
+                    <small>(〆切: ${todo.due_date || '未設定'})</small>
+                </div>
+                <div class="task-buttons">
+                    <button class="edit-btn">編集</button>
+                    <input type="checkbox" class="complete-checkbox" title="完了">
+                </div>
             `;
             todoList.appendChild(li);
+
+            // ★追加点: 編集ボタンにイベントリスナーを追加
+            li.querySelector('.edit-btn').addEventListener('click', () => {
+                openEditModal(todo);
+            });
         });
     }
 
@@ -163,3 +175,51 @@ async function loadTodos(userId) {
         });
     });
 }
+
+// ★追加点: 編集モーダルを開く関数
+function openEditModal(todo) {
+    document.getElementById('edit-todo-id').value = todo.id;
+    document.getElementById('edit-task-name').value = todo.task_name;
+    document.getElementById('edit-due-date').value = todo.due_date;
+    document.getElementById('edit-todo-modal').style.display = 'flex';
+}
+
+// ★追加点: ファイルの末尾に編集モーダルの処理を追加
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (既存のDOMContentLoaded内の処理はそのまま) ...
+
+    const editForm = document.getElementById('edit-todo-form');
+    const editModal = document.getElementById('edit-todo-modal');
+    const cancelBtn = document.getElementById('edit-modal-cancel-btn');
+
+    // 更新フォームの送信処理
+    editForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const todoId = document.getElementById('edit-todo-id').value;
+        const taskName = document.getElementById('edit-task-name').value;
+        const dueDate = document.getElementById('edit-due-date').value;
+
+        const response = await fetch(`/api/todo/${todoId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_name: taskName,
+                due_date: dueDate,
+            })
+        });
+
+        if (response.ok) {
+            editModal.style.display = 'none';
+            // ユーザー情報を再取得してリストをリロード
+            const user = JSON.parse(localStorage.getItem('pomodoroUser'));
+            loadTodos(user.id);
+        } else {
+            alert('タスクの更新に失敗しました。');
+        }
+    });
+
+    // キャンセルボタンの処理
+    cancelBtn.addEventListener('click', () => {
+        editModal.style.display = 'none';
+    });
+});
