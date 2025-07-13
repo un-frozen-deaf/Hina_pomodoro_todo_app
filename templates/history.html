@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完了履歴</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>完了履歴と統計</h1>
+
+        <h2>直近7日間の完了タスク数</h2>
+        <div style="width: 100%; max-width: 600px; margin: auto;">
+            <canvas id="task-chart"></canvas>
+        </div>
+
+        <hr style="margin: 30px 0;">
+
+        <h2>最近完了したタスク</h2>
+        <ul id="recent-tasks-list">
+            </ul>
+        
+        <div class="task-actions">
+            <a href="/" class="button-link">戻る</a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = JSON.parse(localStorage.getItem('pomodoroUser'));
+            if (!user) {
+                window.location.href = '/';
+                return;
+            }
+
+            const response = await fetch(`/api/stats/${user.id}`);
+            const stats = await response.json();
+
+            // グラフの描画
+            const ctx = document.getElementById('task-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar', // 棒グラフ
+                data: {
+                    labels: stats.chart_labels,
+                    datasets: [{
+                        label: '完了タスク数',
+                        data: stats.chart_data,
+                        backgroundColor: 'rgba(23, 162, 184, 0.6)',
+                        borderColor: 'rgba(23, 162, 184, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1 // y軸の目盛りを整数に
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 最近完了したタスクリストの表示
+            const taskList = document.getElementById('recent-tasks-list');
+            if (stats.recent_tasks.length > 0) {
+                stats.recent_tasks.forEach(task => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>${task.task_name}</span><small>完了日: ${task.completed_at}</small>`;
+                    taskList.appendChild(li);
+                });
+            } else {
+                taskList.innerHTML = '<li>完了したタスクはまだありません。</li>';
+            }
+        });
+    </script>
+</body>
+</html>

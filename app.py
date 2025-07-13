@@ -168,3 +168,83 @@ def update_todo(todo_id):
     
     return jsonify({'message': 'ToDo updated successfully'})
 
+# ★追加点: 日付を扱うためにdatetimeをインポート
+from datetime import date
+
+# ... (既存のUser, Todoモデル定義の下に追記) ...
+
+# ★追加点: 完了済みタスクを記録するモデル
+class CompletedTask(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    task_name = db.Column(db.String(200), nullable=False)
+    completed_at = db.Column(db.Date, nullable=False, default=date.today)
+
+# ... (既存のAPIエンドポイントを修正・追記) ...
+
+# ★修正点: タスク完了API (/api/todos/complete/<int:todo_id>) を修正
+@app.route('/api/todos/complete/<int:todo_id>', methods=['POST'])
+def complete_todo(todo_id):
+    todo = Todo.query.get(todo_id)
+    if not todo:
+        return jsonify({'error': 'ToDo not found'}), 404
+    
+    # 完了済みタスクテーブルに記録
+    completed = CompletedTask(
+        user_id=todo.user_id,
+        task_name=todo.task_name
+    )
+    db.session.add(completed)
+    
+    # 元のToDoは削除する
+    db.session.delete(todo)
+    db.session.commit()
+    
+    return jsonify({'message': 'ToDo moved to completed tasks'})
+
+# ★追加点: 完了済みタスクの統計データを返すAPI
+@app.route('/api/stats/<int:user_id>', methods=['GET'])
+def get_stats(user_id):
+    # 直近7日間の日別完了タスク数を集計
+    from sqlalchemy import func, text
+    from datetime import timedelta
+
+    today = date.today()
+    seven_days_ago = today - timedelta(days=6)
+
+    # 日付ごとにグループ化してカウント
+    stats_data = db.session.query(
+        CompletedTask.completed_at,
+        func.count(CompletedTask.id)
+    ).filter(
+        CompletedTask.user_id == user_id,
+        CompletedTask.completed_at >= seven_days_ago
+    ).group_by(
+        CompletedTask.completed_at
+    ).order_by(
+        CompletedTask.completed_at
+    ).all()
+    
+    # 日付ラベルとデータを作成
+    labels = [(today - timedelta(days=i)).strftime('%m/%d') for i in range(6, -1, -1)]
+    data_map = {stat.completed_at.strftime('%m/%d'): stat[1] for stat in stats_data}
+    counts = [data_map.get(label, 0) for label in labels]
+
+    # 最近完了したタスク5件
+    recent_tasks = CompletedTask.query.filter_by(
+        user_id=user_id
+    ).order_by(
+        CompletedTask.completed_at.desc()
+    ).limit(5).all()
+
+    return jsonify({
+        'chart_labels': labels,
+        'chart_data': counts,
+        'recent_tasks': [{'task_name': task.task_name, 'completed_at': task.completed_at.strftime('%Y-%m-%d')} for task in recent_tasks]
+    })
+
+
+# ★追加点: 履歴ページへのルーティング
+@app.route('/history')
+def history_page():
+    return render_template('history.html')
